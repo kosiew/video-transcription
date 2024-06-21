@@ -16,7 +16,7 @@ def extract_wav(
 ) -> str:  # get wav filename from input video
     filename_without_extension = os.path.splitext(input_video)[0]
     wav_file = filename_without_extension + ".wav"
-    extract_wav_command = f'ffmpeg -i {input_video} -ac 1 -ar 16000 "{wav_file}"'
+    extract_wav_command = f'ffmpeg -i "{input_video}" -ac 1 -ar 16000 "{wav_file}"'
     print(f"Extracting audio to {wav_file}")
     subprocess.run(extract_wav_command, shell=True)
     return wav_file
@@ -38,9 +38,14 @@ def transcribe_wav(
     return srt_file
 
 
-def transcribe_video(input_video):
+@app.command()
+def transcribe_video(
+    input_video: Annotated[str, Argument(help="The path to the input video file")]
+) -> str:
     wav_file = extract_wav(input_video)
     srt_file = transcribe_wav(wav_file)
+    # delete wav file
+    os.remove(wav_file)
     return srt_file
 
 
@@ -60,17 +65,13 @@ def add_srt_to_video(input_video, subtitles_file, output_file):
 
 
 @app.command()
-def main(input_video_path: Annotated[str, Argument(...)]):
-    transcribe_video(input_video_path)
-
-
-@app.command()
 def transcribe_folder(
     folder: Annotated[str, Argument(help="The path to the folder with video files")]
 ):
     for file in os.listdir(folder):
         if file.endswith(".mp4") or file.endswith(".mkv"):
-            transcribe_video(os.path.join(folder, file))
+            srt_file = transcribe_video(os.path.join(folder, file))
+            print(f"Transcribed {file} to {srt_file}")
 
 
 if __name__ == "__main__":
