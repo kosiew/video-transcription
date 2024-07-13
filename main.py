@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import Annotated
 
 import typer
+from numpy import short
 from rich import print
 from typer import Argument
 
@@ -20,8 +21,9 @@ regex = re.compile(pattern)
 def extract_wav(
     input_video: Annotated[str, Argument(help="The path to the input video file")]
 ) -> str:  # get wav filename from input video
-    filename_without_extension = os.path.splitext(input_video)[0]
-    wav_file = filename_without_extension + ".wav"
+
+    short_filename_without_extension = shorten_filename(input_video)
+    wav_file = short_filename_without_extension + ".wav"
     extract_wav_command = f'ffmpeg -i "{input_video}" -ac 1 -ar 16000 "{wav_file}"'
     print(f"Extracting audio to {wav_file}")
     subprocess.run(extract_wav_command, shell=True)
@@ -35,12 +37,12 @@ def transcribe_wav(
     whisper = "/Users/kosiew/github/whisper.cpp/main  -m /Users/kosiew/GitHub/whisper.cpp/models/ggml-large-v2.bin"
     whisper_command = f'{whisper} -osrt -f "{wav_file}"'
     wav_srt_file = f"{wav_file}.srt"
-    srt_file = wav_srt_file.replace(".wav", "")
-    srt_file = shorten_srt_filename(srt_file)
-    
-    print(f"Transcribing audio from {wav_file} to {srt_file}")
+
+    print(f"Transcribing audio from {wav_file} to {wav_srt_file}")
     subprocess.run(whisper_command, shell=True)
+    srt_file = wav_srt_file.replace(".wav", "")
     # os rename the file
+    print(f"Renaming {wav_srt_file} to {srt_file}")
     os.rename(wav_srt_file, srt_file)
     return srt_file
 
@@ -70,24 +72,37 @@ def add_srt_to_video(input_video, subtitles_file, output_file):
     transcribe_video(input_video_path)
     add_srt_to_video(input_video_path, output_file)
 
-def shorten_srt_filename(srt_file: str) -> str:
-    # eg shorten /Volumes/F/Movies/Harry Wild/Season 1/Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks.srt
-    # to /Volumes/F/Movies/Harry Wild/Season 1/S01E02.srt
+
+def shorten_filename(filepath: str) -> str:
+    # eg shorten /Volumes/F/Movies/Harry Wild/Season 1/Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks
+    # to /Volumes/F/Movies/Harry Wild/Season 1/S01E02
+
+    filepath_without_extension = os.path.splitext(filepath)[0]
     global regex
-    match = regex.search(srt_file)
-    
-    short_filename = srt_file
-    
+    match = regex.search(filepath_without_extension)
+
+    short_filename = filepath_without_extension
+
     # use regex replace
     if match:
         season = match.group(1)
         episode = match.group(2)
-        _short_filename = f"S{season}E{episode}.srt"
+        _short_filename = f"S{season}E{episode}"
         # join folder to short_filename
-        folder = os.path.dirname(srt_file)
+        folder = os.path.dirname(filepath_without_extension)
         short_filename = os.path.join(folder, _short_filename)
-        
+
     return short_filename
+
+
+def shorten_srt_filename(srt_file: str) -> str:
+    # eg shorten /Volumes/F/Movies/Harry Wild/Season 1/Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks.srt
+    # to /Volumes/F/Movies/Harry Wild/Season 1/S01E02.srt
+
+    short_filepath = shorten_filename(srt_file) + ".srt"
+
+    return short_filepath
+
 
 @app.command()
 def rename_to_short_srt_filename_in_folder(
@@ -99,7 +114,7 @@ def rename_to_short_srt_filename_in_folder(
             rename_to_short_srt_filename(os.path.join(folder, file))
             file_count += 1
     print(f"Renamed {file_count} files")
-    
+
 
 @app.command()
 def rename_to_short_srt_filename(
@@ -108,7 +123,8 @@ def rename_to_short_srt_filename(
     short_filename = shorten_srt_filename(srt_file)
     if short_filename != srt_file:
         os.rename(srt_file, short_filename)
-        print(f"Renamed {srt_file} to {short_filename}")    
+        print(f"Renamed {srt_file} to {short_filename}")
+
 
 @app.command()
 def transcribe_folder(
@@ -121,6 +137,7 @@ def transcribe_folder(
             print(f"Transcribed {file} to {srt_file}")
             file_count += 1
     print(f"Transcribed {file_count} files")
+
 
 if __name__ == "__main__":
     app()
