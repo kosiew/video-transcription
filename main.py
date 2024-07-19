@@ -14,7 +14,7 @@ app = typer.Typer()
 # sample srt file name Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks.srt
 # regex pattern to extract the season and episode number
 pattern = r"S(\d{2})E(\d{2})"
-regex = re.compile(pattern)
+regex = re.compile(pattern, re.IGNORECASE)
 
 
 @app.command()
@@ -25,7 +25,7 @@ def extract_wav(
     short_filename_without_extension = shorten_filename(input_video)
     wav_file = short_filename_without_extension + ".wav"
     extract_wav_command = f'ffmpeg -i "{input_video}" -ac 1 -ar 16000 "{wav_file}"'
-    print(f"Extracting audio to {wav_file}")
+    print(f"==> Extracting audio to {wav_file}")
     subprocess.run(extract_wav_command, shell=True)
     return wav_file
 
@@ -36,13 +36,14 @@ def transcribe_wav(
 ) -> str:
     whisper = "/Users/kosiew/github/whisper.cpp/main  -m /Users/kosiew/GitHub/whisper.cpp/models/ggml-large-v2.bin"
     whisper_command = f'{whisper} -osrt -f "{wav_file}"'
-    wav_srt_file = f"{wav_file}.srt"
 
-    print(f"Transcribing audio from {wav_file} to {wav_srt_file}")
+    print(f"==> Transcribing audio from {wav_file}")
     subprocess.run(whisper_command, shell=True)
+
+    wav_srt_file = f"{wav_file}.srt"
     srt_file = wav_srt_file.replace(".wav", "")
-    # os rename the file
-    print(f"Renaming {wav_srt_file} to {srt_file}")
+    # rename srt file, remove .wav from filename
+    print(f"==> Renaming {wav_srt_file} to {srt_file}")
     os.rename(wav_srt_file, srt_file)
     return srt_file
 
@@ -53,24 +54,10 @@ def transcribe_video(
 ) -> str:
     wav_file = extract_wav(input_video)
     srt_file = transcribe_wav(wav_file)
-    # delete wav file
+    # remove wav file
+    print(f"==> Removing {wav_file}")
     os.remove(wav_file)
     return srt_file
-
-
-# not required
-def add_srt_to_video(input_video, subtitles_file, output_file):
-
-    # FFmpeg command
-    ffmpeg_command = f"""ffmpeg -i {input_video} -vf "subtitles={subtitles_file}:force_style='FontName=Arial,FontSize=10,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,BorderStyle=3,Outline=1,Shadow=1,Alignment=2,MarginV=10'" -c:a copy {output_file} -y """
-
-    # Run the FFmpeg command
-    subprocess.run(ffmpeg_command, shell=True)
-
-    input_video_path = "input.mp4"
-    output_file = "output.mp4"
-    transcribe_video(input_video_path)
-    add_srt_to_video(input_video_path, output_file)
 
 
 def shorten_filename(filepath: str) -> str:
@@ -113,7 +100,7 @@ def rename_to_short_srt_filename_in_folder(
         if file.endswith(".srt"):
             rename_to_short_srt_filename(os.path.join(folder, file))
             file_count += 1
-    print(f"Renamed {file_count} files")
+    print(f"==> Renamed {file_count} files")
 
 
 @app.command()
@@ -123,7 +110,7 @@ def rename_to_short_srt_filename(
     short_filename = shorten_srt_filename(srt_file)
     if short_filename != srt_file:
         os.rename(srt_file, short_filename)
-        print(f"Renamed {srt_file} to {short_filename}")
+        print(f"==> Renamed {srt_file} to {short_filename}")
 
 
 @app.command()
@@ -134,9 +121,9 @@ def transcribe_folder(
     for file in os.listdir(folder):
         if file.endswith(".mp4") or file.endswith(".mkv"):
             srt_file = transcribe_video(os.path.join(folder, file))
-            print(f"Transcribed {file} to {srt_file}")
+            print(f"==> Transcribed {file} to {srt_file}")
             file_count += 1
-    print(f"Transcribed {file_count} files")
+    print(f"==> Transcribed {file_count} files")
 
 
 if __name__ == "__main__":
