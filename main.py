@@ -10,7 +10,7 @@ from rich import print
 from typer import Argument
 
 # requires /Users/kosiew/GitHub/whisper.cpp and ffmpeg, the above
-# imports  
+# imports
 app = typer.Typer()
 
 # sample srt file name Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks.srt
@@ -42,12 +42,22 @@ def transcribe_wav(
     print(f"==> Transcribing audio from {wav_file}")
     subprocess.run(whisper_command, shell=True)
 
-    wav_srt_file = f"{wav_file}.srt"
-    srt_file = wav_srt_file.replace(".wav", "")
+    srt_file = rename_wav_to_srt(wav_file)
+    return srt_file
+
+
+def rename_wav_to_srt(wav_file):
+    wav_srt_file, srt_file = get_wav_srt_filename(wav_file)
     # rename srt file, remove .wav from filename
     print(f"==> Renaming {wav_srt_file} to {srt_file}")
     os.rename(wav_srt_file, srt_file)
     return srt_file
+
+
+def get_wav_srt_filename(wav_file):
+    wav_srt_file = f"{wav_file}.srt"
+    srt_file = wav_srt_file.replace(".wav", "")
+    return wav_srt_file, srt_file
 
 
 @app.command()
@@ -55,7 +65,12 @@ def transcribe_video(
     input_video: Annotated[str, Argument(help="The path to the input video file")]
 ) -> str:
     wav_file = extract_wav(input_video)
-    srt_file = transcribe_wav(wav_file)
+    _, _srt_file = get_wav_srt_filename(wav_file)
+    srt_file = _srt_file
+    if os.path.exists(_srt_file):
+        print(f"==> {wav_file} already transcribed, skipping")
+    else:
+        srt_file = transcribe_wav(wav_file)
     # remove wav file
     print(f"==> Removing {wav_file}")
     os.remove(wav_file)
