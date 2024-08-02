@@ -9,6 +9,8 @@ from numpy import short
 from rich import print
 from typer import Argument
 
+# requires /Users/kosiew/GitHub/whisper.cpp and ffmpeg, the above
+# imports  
 app = typer.Typer()
 
 # sample srt file name Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks.srt
