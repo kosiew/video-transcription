@@ -1,17 +1,17 @@
+import fnmatch
 import os
 import re
 import subprocess
 from datetime import timedelta
 from typing import Annotated, Optional
 
-import typer
 from numpy import short
 from rich import print
-from typer import Argument
+from typer import Argument, Option, Typer
 
 # requires /Users/kosiew/GitHub/whisper.cpp and ffmpeg, the above
 # imports
-app = typer.Typer()
+app = Typer()
 
 # sample srt file name Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks.srt
 # regex pattern to extract the season and episode number
@@ -144,16 +144,35 @@ def rename_to_short_srt_filename(
 
 @app.command()
 def transcribe_folder(
-    folder: Annotated[str, Argument(help="The path to the folder with video files")]
+    path_pattern: Annotated[
+        str, Argument(help="The path to the folder with video files")
+    ],
+    file_pattern: Annotated[
+        str,
+        Option(
+            default="*.mp4,*.mkv",
+            help="The pattern to match video files (e.g., '*.mp4' or '*.mkv')",
+        ),
+    ],
 ):
-    file_count = 0
-    for file in os.listdir(folder):
-        if file.endswith(".mp4") or file.endswith(".mkv"):
-            srt_file = transcribe_video(os.path.join(folder, file))
-            if srt_file:
-                print(f"==> Transcribed {file} to {srt_file}")
-                file_count += 1
-    print(f"==> Transcribed {file_count} files")
+    base_folder = os.path.dirname(path_pattern)
+    folder_pattern = os.path.basename(path_pattern)
+
+    total_file_count = 0
+    patterns = file_pattern.split(",")
+    for folder in os.listdir(base_folder):
+        folder_path = os.path.join(base_folder, folder)
+        if os.path.isdir(folder_path) and fnmatch.fnmatch(folder, folder_pattern):
+            file_count = 0
+            for file in os.listdir(folder_path):
+                if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
+                    srt_file = transcribe_video(os.path.join(folder, file))
+                    if srt_file:
+                        print(f"==> Transcribed {file} to {srt_file}")
+                        file_count += 1
+
+            total_file_count += file_count
+    print(f"==> Transcribed {total_file_count} files")
 
 
 if __name__ == "__main__":
