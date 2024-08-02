@@ -5,7 +5,7 @@ import subprocess
 from datetime import timedelta
 from typing import Annotated, Optional
 
-from numpy import short
+from numpy import full, short
 from rich import print
 from typer import Argument, Option, Typer
 
@@ -153,7 +153,7 @@ def transcribe_folder(
             default="*.mp4,*.mkv",
             help="The pattern to match video files (e.g., '*.mp4' or '*.mkv')",
         ),
-    ],
+    ] = "*.mp4,*.mkv",
 ):
     base_folder = os.path.dirname(path_pattern)
     folder_pattern = os.path.basename(path_pattern)
@@ -166,7 +166,8 @@ def transcribe_folder(
             file_count = 0
             for file in os.listdir(folder_path):
                 if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
-                    srt_file = transcribe_video(os.path.join(folder, file))
+                    full_file_path = os.path.join(folder_path, file)
+                    srt_file = transcribe_video(full_file_path)
                     if srt_file:
                         print(f"==> Transcribed {file} to {srt_file}")
                         file_count += 1
