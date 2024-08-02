@@ -24,11 +24,16 @@ def extract_wav(
     input_video: Annotated[str, Argument(help="The path to the input video file")]
 ) -> str:  # get wav filename from input video
 
-    short_filename_without_extension = shorten_filename(input_video)
-    wav_file = short_filename_without_extension + ".wav"
+    wav_file = get_wav_filename(input_video)
     extract_wav_command = f'ffmpeg -i "{input_video}" -ac 1 -ar 16000 "{wav_file}"'
     print(f"==> Extracting audio to {wav_file}")
     subprocess.run(extract_wav_command, shell=True)
+    return wav_file
+
+
+def get_wav_filename(input_video):
+    short_filename_without_extension = shorten_filename(input_video)
+    wav_file = short_filename_without_extension + ".wav"
     return wav_file
 
 
@@ -64,17 +69,18 @@ def get_wav_srt_filename(wav_file):
 def transcribe_video(
     input_video: Annotated[str, Argument(help="The path to the input video file")]
 ) -> str:
-    wav_file = extract_wav(input_video)
-    _, _srt_file = get_wav_srt_filename(wav_file)
-    srt_file = _srt_file
+    _wav_file = get_wav_filename(input_video)
+    _, _srt_file = get_wav_srt_filename(_wav_file)
+
     if os.path.exists(_srt_file):
-        print(f"==> {wav_file} already transcribed, skipping")
+        print(f"==> {input_video} already transcribed, skipping")
+        return _srt_file
     else:
+        wav_file = extract_wav(input_video)
         srt_file = transcribe_wav(wav_file)
-    # remove wav file
-    print(f"==> Removing {wav_file}")
-    os.remove(wav_file)
-    return srt_file
+        print(f"==> Removing {wav_file}")
+        os.remove(wav_file)
+        return srt_file
 
 
 def shorten_filename(filepath: str) -> str:
