@@ -2,7 +2,7 @@ import os
 import re
 import subprocess
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 from numpy import short
@@ -68,19 +68,25 @@ def get_wav_srt_filename(wav_file):
 @app.command()
 def transcribe_video(
     input_video: Annotated[str, Argument(help="The path to the input video file")]
-) -> str:
-    _wav_file = get_wav_filename(input_video)
-    _, _srt_file = get_wav_srt_filename(_wav_file)
+) -> Optional[str]:
+    already_transcribed = check_whether_transcribed(input_video)
 
-    if os.path.exists(_srt_file):
+    if already_transcribed:
         print(f"==> {input_video} already transcribed, skipping")
-        return _srt_file
+        return None
     else:
         wav_file = extract_wav(input_video)
         srt_file = transcribe_wav(wav_file)
         print(f"==> Removing {wav_file}")
         os.remove(wav_file)
         return srt_file
+
+
+def check_whether_transcribed(input_video):
+    _wav_file = get_wav_filename(input_video)
+    _, _srt_file = get_wav_srt_filename(_wav_file)
+    already_transcribed = os.path.exists(_srt_file)
+    return already_transcribed
 
 
 def shorten_filename(filepath: str) -> str:
@@ -144,8 +150,9 @@ def transcribe_folder(
     for file in os.listdir(folder):
         if file.endswith(".mp4") or file.endswith(".mkv"):
             srt_file = transcribe_video(os.path.join(folder, file))
-            print(f"==> Transcribed {file} to {srt_file}")
-            file_count += 1
+            if srt_file:
+                print(f"==> Transcribed {file} to {srt_file}")
+                file_count += 1
     print(f"==> Transcribed {file_count} files")
 
 
