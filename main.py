@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 from datetime import timedelta
+from shlex import join
 from typing import Annotated, Optional
 
 from numpy import full, short
@@ -155,29 +156,42 @@ def transcribe_folder(
         ),
     ] = "*.mp4,*.mkv",
 ):
-    base_folder = os.path.dirname(path_pattern)
-    folder_pattern = os.path.basename(path_pattern)
-
-    total_file_count = 0
     patterns = file_pattern.split(",")
-    for folder in os.listdir(base_folder):
-        folder_path = os.path.join(base_folder, folder)
-        if os.path.isdir(folder_path) and fnmatch.fnmatch(folder, folder_pattern):
-            file_count = 0
-            for file in os.listdir(folder_path):
-                maybe_transcribe_video(patterns, folder_path, file_count, file)
 
-            total_file_count += file_count
-    print(f"==> Transcribed {total_file_count} files")
+    file_count = 0
+    if os.path.isdir(path_pattern):
+        # The path is a directory, process it directly
+        folder_path = path_pattern
+        for file in os.listdir(folder_path):
+            full_file_path = os.path.join(folder_path, file)
+            if os.path.isfile(full_file_path):
+                if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
+                    srt_file = transcribe_video(full_file_path)
+                    if srt_file:
+                        print(f"==> Transcribed {file} to {srt_file}")
+                        file_count += 1
+            else:
+                file_count += transcribe_folder(full_file_path, file_pattern)
+    else:
+        base_folder = os.path.dirname(path_pattern)
+        folder_pattern = os.path.basename(path_pattern)
+        for folder in os.listdir(base_folder):
+            folder_path = os.path.join(base_folder, folder)
+            is_dir = os.path.isdir(folder_path)
+            if is_dir and fnmatch.fnmatch(folder, folder_pattern):
+                file_count += transcribe_folder(folder_path, file_pattern)
+    print(f"==> Transcribed {file_count} files")
+    return file_count
 
 
 def maybe_transcribe_video(patterns, folder_path, file_count, file):
-    if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
-        full_file_path = os.path.join(folder_path, file)
-        srt_file = transcribe_video(full_file_path)
-        if srt_file:
-            print(f"==> Transcribed {file} to {srt_file}")
-            file_count += 1
+    full_file_path = os.path.join(folder_path, file)
+    if os.path.isfile(full_file_path):
+        if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
+            srt_file = transcribe_video(full_file_path)
+            if srt_file:
+                print(f"==> Transcribed {file} to {srt_file}")
+                file_count += 1
 
 
 if __name__ == "__main__":
