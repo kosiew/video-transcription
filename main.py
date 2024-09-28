@@ -165,15 +165,19 @@ def transcribe_folder(
         if os.path.isdir(folder_path) and fnmatch.fnmatch(folder, folder_pattern):
             file_count = 0
             for file in os.listdir(folder_path):
-                if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
-                    full_file_path = os.path.join(folder_path, file)
-                    srt_file = transcribe_video(full_file_path)
-                    if srt_file:
-                        print(f"==> Transcribed {file} to {srt_file}")
-                        file_count += 1
+                maybe_transcribe_video(patterns, folder_path, file_count, file)
 
             total_file_count += file_count
     print(f"==> Transcribed {total_file_count} files")
+
+
+def maybe_transcribe_video(patterns, folder_path, file_count, file):
+    if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
+        full_file_path = os.path.join(folder_path, file)
+        srt_file = transcribe_video(full_file_path)
+        if srt_file:
+            print(f"==> Transcribed {file} to {srt_file}")
+            file_count += 1
 
 
 if __name__ == "__main__":
