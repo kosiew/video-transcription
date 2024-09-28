@@ -5,6 +5,7 @@ import subprocess
 from datetime import timedelta
 from typing import Annotated, Optional
 
+from genericpath import isfile
 from numpy import full, short
 from rich import print
 from typer import Argument, Option, Typer
@@ -142,6 +143,19 @@ def rename_to_short_srt_filename(
         print(f"==> Renamed {srt_file} to {short_filename}")
 
 
+def _transcribe_folder(folder_path: str, patterns: list) -> int:
+    file_count = 0
+    for file in os.listdir(folder_path):
+        if os.path.isfile(os.path.join(folder_path, file)):
+            if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
+                full_file_path = os.path.join(folder_path, file)
+                srt_file = transcribe_video(full_file_path)
+                if srt_file:
+                    print(f"==> Transcribed {file} to {srt_file}")
+                    file_count += 1
+    return file_count
+
+
 @app.command()
 def transcribe_folder(
     path_pattern: Annotated[
@@ -160,19 +174,16 @@ def transcribe_folder(
 
     total_file_count = 0
     patterns = file_pattern.split(",")
+
     for folder in os.listdir(base_folder):
         folder_path = os.path.join(base_folder, folder)
-        if os.path.isdir(folder_path) and fnmatch.fnmatch(folder, folder_pattern):
-            file_count = 0
-            for file in os.listdir(folder_path):
-                if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
-                    full_file_path = os.path.join(folder_path, file)
-                    srt_file = transcribe_video(full_file_path)
-                    if srt_file:
-                        print(f"==> Transcribed {file} to {srt_file}")
-                        file_count += 1
 
-            total_file_count += file_count
+        if os.path.isfile(folder_path) and fnmatch.fnmatch(folder, folder_pattern):
+            total_file_count += _transcribe_folder(base_folder, patterns)
+
+        elif os.path.isdir(folder_path) and fnmatch.fnmatch(folder, folder_pattern):
+            total_file_count += _transcribe_folder(folder_path, patterns)
+
     print(f"==> Transcribed {total_file_count} files")
 
 
