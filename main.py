@@ -14,6 +14,8 @@ from typer import Argument, Option, Typer
 # imports
 app = Typer()
 
+MODEL = "large-v3-turbo"
+
 # sample srt file name Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks.srt
 # regex pattern to extract the season and episode number
 pattern = r"S(\d{2})E(\d{2})"
@@ -42,7 +44,7 @@ def get_wav_filename(input_video):
 def transcribe_wav(
     wav_file: Annotated[str, Argument(help="The path to the .wav file to transcribe")]
 ) -> str:
-    whisper = "/Users/kosiew/github/whisper.cpp/main  -m /Users/kosiew/GitHub/whisper.cpp/models/ggml-large-v2.bin"
+    whisper = f"/Users/kosiew/github/whisper.cpp/main  -m /Users/kosiew/GitHub/whisper.cpp/models/ggml-{MODEL}.bin"
     whisper_command = f'{whisper} -osrt -f "{wav_file}"'
 
     print(f"==> Transcribing audio from {wav_file}")
@@ -165,11 +167,7 @@ def transcribe_folder(
         for file in os.listdir(folder_path):
             full_file_path = os.path.join(folder_path, file)
             if os.path.isfile(full_file_path):
-                if any(fnmatch.fnmatch(file, pattern) for pattern in patterns):
-                    srt_file = transcribe_video(full_file_path)
-                    if srt_file:
-                        print(f"==> Transcribed {file} to {srt_file}")
-                        file_count += 1
+                maybe_transcribe_video(patterns, folder_path, file_count, file)
             else:
                 file_count += transcribe_folder(full_file_path, file_pattern)
     else:
