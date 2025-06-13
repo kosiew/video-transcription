@@ -192,5 +192,153 @@ def maybe_transcribe_video(patterns, folder_path, file_count, file):
                 file_count += 1
 
 
+@app.command()
+def sanitize_srt_files(
+    folder: Annotated[str, Argument(help="The folder containing srt files to sanitize")],
+    min_repetitions: Annotated[int, Option(help="Minimum number of repetitions to consider as spam")] = 3,
+    similarity_threshold: Annotated[float, Option(help="Similarity threshold for detecting repetitive text (0.0-1.0)")] = 0.8
+):
+    """Sanitize SRT files by removing repetitive subtitles that appear for extended periods."""
+    file_count = 0
+    cleaned_count = 0
+    
+    for file in os.listdir(folder):
+        if file.endswith(".srt"):
+            file_path = os.path.join(folder, file)
+            if sanitize_srt_file(file_path, min_repetitions, similarity_threshold):
+                cleaned_count += 1
+            file_count += 1
+    
+    print(f"==> Processed {file_count} SRT files, cleaned {cleaned_count} files")
+
+
+def sanitize_srt_file(srt_file: str, min_repetitions: int = 3, similarity_threshold: float = 0.8) -> bool:
+    """Sanitize a single SRT file by removing repetitive subtitles."""
+    try:
+        with open(srt_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        subtitles = parse_srt_content(content)
+        original_count = len(subtitles)
+        
+        if original_count == 0:
+            return False
+        
+        cleaned_subtitles = remove_repetitive_subtitles(subtitles, min_repetitions, similarity_threshold)
+        cleaned_count = len(cleaned_subtitles)
+        
+        if cleaned_count < original_count:
+            # Write the cleaned content back
+            cleaned_content = generate_srt_content(cleaned_subtitles)
+            with open(srt_file, 'w', encoding='utf-8') as f:
+                f.write(cleaned_content)
+            
+            removed_count = original_count - cleaned_count
+            print(f"==> Cleaned {srt_file}: removed {removed_count} repetitive subtitles ({original_count} → {cleaned_count})")
+            return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"==> Error processing {srt_file}: {e}")
+        return False
+
+
+def parse_srt_content(content: str) -> list:
+    """Parse SRT content into a list of subtitle dictionaries."""
+    subtitles = []
+    blocks = content.strip().split('\n\n')
+    
+    for block in blocks:
+        lines = block.strip().split('\n')
+        if len(lines) >= 3:
+            try:
+                index = int(lines[0])
+                timestamp = lines[1]
+                text = '\n'.join(lines[2:])
+                
+                subtitles.append({
+                    'index': index,
+                    'timestamp': timestamp,
+                    'text': text.strip()
+                })
+            except (ValueError, IndexError):
+                continue
+    
+    return subtitles
+
+
+def remove_repetitive_subtitles(subtitles: list, min_repetitions: int, similarity_threshold: float) -> list:
+    """Remove repetitive subtitles from the list."""
+    if len(subtitles) < min_repetitions:
+        return subtitles
+    
+    cleaned_subtitles = []
+    i = 0
+    
+    while i < len(subtitles):
+        current_text = normalize_text(subtitles[i]['text'])
+        repetition_count = 1
+        
+        # Check for repetitions starting from current position
+        j = i + 1
+        while j < len(subtitles) and repetition_count < min_repetitions:
+            next_text = normalize_text(subtitles[j]['text'])
+            if calculate_similarity(current_text, next_text) >= similarity_threshold:
+                repetition_count += 1
+                j += 1
+            else:
+                break
+        
+        # If we found enough repetitions, skip them all
+        if repetition_count >= min_repetitions:
+            print(f"    Removing {repetition_count} repetitive subtitles: '{current_text[:50]}...'")
+            i = j  # Skip all repetitive subtitles
+        else:
+            # Keep the current subtitle and move to next
+            cleaned_subtitles.append(subtitles[i])
+            i += 1
+    
+    # Reindex the cleaned subtitles
+    for idx, subtitle in enumerate(cleaned_subtitles, 1):
+        subtitle['index'] = idx
+    
+    return cleaned_subtitles
+
+
+def normalize_text(text: str) -> str:
+    """Normalize text for comparison by removing extra whitespace and converting to lowercase."""
+    return re.sub(r'\s+', ' ', text.lower().strip())
+
+
+def calculate_similarity(text1: str, text2: str) -> float:
+    """Calculate similarity between two texts using simple character-based comparison."""
+    if not text1 and not text2:
+        return 1.0
+    if not text1 or not text2:
+        return 0.0
+    
+    # Simple character-based similarity
+    longer = text1 if len(text1) > len(text2) else text2
+    shorter = text2 if len(text1) > len(text2) else text1
+    
+    if len(longer) == 0:
+        return 1.0
+    
+    # Count matching characters
+    matches = sum(c1 == c2 for c1, c2 in zip(shorter, longer))
+    return matches / len(longer)
+
+
+def generate_srt_content(subtitles: list) -> str:
+    """Generate SRT content from a list of subtitle dictionaries."""
+    content_parts = []
+    
+    for subtitle in subtitles:
+        content_parts.append(f"{subtitle['index']}\n{subtitle['timestamp']}\n{subtitle['text']}\n")
+    
+    return '\n'.join(content_parts)
+
+
 if __name__ == "__main__":
     app()
