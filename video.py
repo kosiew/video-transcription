@@ -2,6 +2,7 @@ import fnmatch
 import os
 import re
 import subprocess
+import time
 from datetime import timedelta
 from shlex import join
 from typing import Annotated, Optional
@@ -362,6 +363,7 @@ def downscale_mkv_folder(
 
 def downscale_mkv_file(mkv_file: str, scale_factor: int = 50, compression: str = HIGH_COMPRESSION) -> bool:
     """Downscale a single MKV file to a lower resolution."""
+    start_time = time.time()
     try:
         # Calculate target resolution
         # 1080p = 1920x1080, scale to percentage
@@ -392,10 +394,12 @@ def downscale_mkv_file(mkv_file: str, scale_factor: int = 50, compression: str =
         result = subprocess.run(ffmpeg_command, shell=True, capture_output=True)
         
         if result.returncode == 0:
-            print(f"==> Successfully converted to {output_file}")
+            elapsed_time = time.time() - start_time
+            print(f"==> Successfully converted to {output_file} (took {elapsed_time:.2f}s)")
             return True
         else:
-            print(f"==> Error converting {mkv_file}: {result.stderr.decode()}")
+            elapsed_time = time.time() - start_time
+            print(f"==> Error converting {mkv_file}: {result.stderr.decode()} (took {elapsed_time:.2f}s)")
             return False
             
     except Exception as e:
