@@ -340,5 +340,64 @@ def generate_srt_content(subtitles: list) -> str:
     return '\n'.join(content_parts)
 
 
+@app.command()
+def downscale_mkv_folder(
+    folder: Annotated[str, Argument(help="The folder containing mkv files to downscale")],
+    scale_factor: Annotated[float, Option(help="Scale factor as a percentage (e.g., 50 for 50% = 720p from 1080p)")] = 50,
+):
+    """Downscale 1080p MKV files to a lower resolution (e.g., 50% -> 720p)."""
+    file_count = 0
+    converted_count = 0
+    
+    for file in os.listdir(folder):
+        if file.endswith(".mkv"):
+            file_path = os.path.join(folder, file)
+            if downscale_mkv_file(file_path, scale_factor):
+                converted_count += 1
+            file_count += 1
+    
+    print(f"==> Processed {file_count} MKV files, converted {converted_count} files")
+
+
+def downscale_mkv_file(mkv_file: str, scale_factor: float = 50) -> bool:
+    """Downscale a single MKV file to a lower resolution."""
+    try:
+        # Calculate target resolution
+        # 1080p = 1920x1080, scale to percentage
+        scale_percent = scale_factor / 100
+        target_width = int(1920 * scale_percent)
+        target_height = int(1080 * scale_percent)
+        
+        # Ensure dimensions are even (required for many codecs)
+        target_width = target_width if target_width % 2 == 0 else target_width - 1
+        target_height = target_height if target_height % 2 == 0 else target_height - 1
+        
+        # Create output filename with _downscaled suffix
+        base_path = os.path.splitext(mkv_file)[0]
+        output_file = f"{base_path}_downscaled.mkv"
+        
+        # Check if output already exists
+        if os.path.exists(output_file):
+            print(f"==> {output_file} already exists, skipping")
+            return False
+        
+        # FFmpeg command to downscale video
+        ffmpeg_command = f'ffmpeg -i "{mkv_file}" -vf scale={target_width}:{target_height} -c:a copy "{output_file}"'
+        
+        print(f"==> Downscaling {mkv_file} to {target_width}x{target_height}")
+        result = subprocess.run(ffmpeg_command, shell=True, capture_output=True)
+        
+        if result.returncode == 0:
+            print(f"==> Successfully converted to {output_file}")
+            return True
+        else:
+            print(f"==> Error converting {mkv_file}: {result.stderr.decode()}")
+            return False
+            
+    except Exception as e:
+        print(f"==> Error processing {mkv_file}: {e}")
+        return False
+
+
 if __name__ == "__main__":
     app()
