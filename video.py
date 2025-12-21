@@ -15,6 +15,7 @@ from typer import Argument, Option, Typer
 app = Typer()
 
 MODEL = "large-v3-turbo"
+HIGH_COMPRESSION = "HIGH_COMPRESSION"
 
 # sample srt file name Harry Wild - S01E02 - Samurai Plague Doctor Kills for Kicks.srt
 # regex pattern to extract the season and episode number
@@ -359,7 +360,7 @@ def downscale_mkv_folder(
     print(f"==> Processed {file_count} MKV files, converted {converted_count} files")
 
 
-def downscale_mkv_file(mkv_file: str, scale_factor: float = 50) -> bool:
+def downscale_mkv_file(mkv_file: str, scale_factor: int = 50, compression: str = HIGH_COMPRESSION) -> bool:
     """Downscale a single MKV file to a lower resolution."""
     try:
         # Calculate target resolution
@@ -381,8 +382,11 @@ def downscale_mkv_file(mkv_file: str, scale_factor: float = 50) -> bool:
             print(f"==> {output_file} already exists, skipping")
             return False
         
-        # FFmpeg command to downscale video
+        # FFmpeg command to downscale video - faster
         ffmpeg_command = f'ffmpeg -i "{mkv_file}" -vf scale={target_width}:{target_height} -c:a copy "{output_file}"'
+        if compression == HIGH_COMPRESSION:
+            # FFmpeg command to downscale video - slower for higher compression
+            ffmpeg_command = f'ffmpeg -i "{mkv_file}" -vf scale={target_width}:{target_height} -c:v libx264 -crf 20 -preset slow -c:a copy "{output_file}"'
         
         print(f"==> Downscaling {mkv_file} to {target_width}x{target_height}")
         result = subprocess.run(ffmpeg_command, shell=True, capture_output=True)
